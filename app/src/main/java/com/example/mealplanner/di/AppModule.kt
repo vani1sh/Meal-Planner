@@ -36,7 +36,7 @@ object AppModule {
             app,
             AppDatabase::class.java,
             "meal_planner_db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides

@@ -12,11 +12,19 @@ data class Product(
     val isCustom: Boolean
 )
 
+enum class MealType(val displayName: String) {
+    BREAKFAST("Завтрак"),
+    LUNCH("Обед"),
+    DINNER("Ужин"),
+    SNACK("Перекус")
+}
+
 data class DiaryEntry(
     val id: Int = 0,
     val product: Product,
     val amountGrams: Int,
-    val timestamp: Long
+    val timestamp: Long,
+    val mealType: MealType
 ) {
     val consumedCalories: Float get() = (product.calories * amountGrams) / 100f
     val consumedProtein: Float get() = (product.protein * amountGrams) / 100f

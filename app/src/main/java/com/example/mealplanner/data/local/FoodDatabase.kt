@@ -22,6 +22,7 @@ data class DiaryEntryEntity(
     val isCustomProduct: Boolean,
     val amountGrams: Int,
     val timestamp: Long,
+    val mealType: String,
     val snapshotName: String,
     val snapshotCalories: Float,
     val snapshotProtein: Float,
@@ -44,7 +45,7 @@ interface FoodDao {
     fun getDiaryEntries(startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntryEntity>>
 }
 
-@Database(entities = [CustomProductEntity::class, DiaryEntryEntity::class], version = 1, exportSchema = false)
+@Database(entities = [CustomProductEntity::class, DiaryEntryEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun foodDao(): FoodDao
 }

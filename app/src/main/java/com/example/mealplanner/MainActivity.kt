@@ -9,6 +9,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -42,16 +44,22 @@ fun MealPlannerNavGraph() {
 
     NavHost(navController = navController, startDestination = "diary") {
         composable("diary") {
-            val viewModel: DiaryViewModel = hiltViewModel()
             DiaryScreen(
-                viewModel = viewModel,
-                onNavigateToAddProduct = { navController.navigate("add_product") }
+                viewModel = hiltViewModel(),
+                onNavigateToAddProduct = { timestamp, mealType ->
+                    navController.navigate("add_product/$timestamp/${mealType.name}")
+                }
             )
         }
-        composable("add_product") {
-            val viewModel: AddProductViewModel = hiltViewModel()
+        composable(
+            route = "add_product/{timestamp}/{mealType}",
+            arguments = listOf(
+                navArgument("timestamp") { type = NavType.LongType },
+                navArgument("mealType") { type = NavType.StringType }
+            )
+        ) {
             AddProductScreen(
-                viewModel = viewModel,
+                viewModel = hiltViewModel(),
                 onBack = { navController.popBackStack() }
             )
         }

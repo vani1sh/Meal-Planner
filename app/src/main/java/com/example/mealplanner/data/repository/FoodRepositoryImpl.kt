@@ -6,6 +6,7 @@ import com.example.mealplanner.data.local.FoodDao
 import com.example.mealplanner.data.remote.OpenFoodFactsApi
 import com.example.mealplanner.data.remote.ProductDto
 import com.example.mealplanner.domain.model.DiaryEntry
+import com.example.mealplanner.domain.model.MealType
 import com.example.mealplanner.domain.model.Product
 import com.example.mealplanner.domain.repository.FoodRepository
 import kotlinx.coroutines.flow.Flow
@@ -54,6 +55,7 @@ class FoodRepositoryImpl(
             isCustomProduct = entry.product.isCustom,
             amountGrams = entry.amountGrams,
             timestamp = entry.timestamp,
+            mealType = entry.mealType.name,
             snapshotName = entry.product.name,
             snapshotCalories = entry.product.calories,
             snapshotProtein = entry.product.protein,
@@ -87,6 +89,7 @@ fun DiaryEntryEntity.toDomain() = DiaryEntry(
     id = id,
     amountGrams = amountGrams,
     timestamp = timestamp,
+    mealType = MealType.valueOf(mealType),
     product = Product(
         id = productId, name = snapshotName, brand = null,
         calories = snapshotCalories, protein = snapshotProtein,
