@@ -10,7 +10,13 @@ interface FoodRepository {
 
     suspend fun saveCustomProduct(product: Product)
 
+    suspend fun deleteCustomProduct(productId: String)
+    suspend fun updateCustomProduct(product: Product)
+
     fun getDiaryForDate(startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntry>>
 
     suspend fun addDiaryEntry(entry: DiaryEntry)
+
+    suspend fun deleteDiaryEntry(entryId: Int)
+    suspend fun updateDiaryEntryWeight(entryId: Int, newAmountGrams: Int)
 }

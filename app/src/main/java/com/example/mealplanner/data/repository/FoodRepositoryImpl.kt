@@ -24,7 +24,13 @@ class FoodRepositoryImpl(
 
             val remoteProducts = api.searchProducts(query).products.mapNotNull { it.toDomain() }
 
-            Result.success(localProducts + remoteProducts)
+            val combinedAndDeduplicated = (localProducts + remoteProducts).distinctBy {
+                val nameRaw = it.name.lowercase().replace("\\s+".toRegex(), "")
+                val brandRaw = it.brand?.lowercase()?.replace("\\s+".toRegex(), "") ?: ""
+                "$nameRaw-$brandRaw"
+            }
+
+            Result.success(combinedAndDeduplicated)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -63,6 +69,30 @@ class FoodRepositoryImpl(
             snapshotCarbs = entry.product.carbs
         )
         dao.insertDiaryEntry(entity)
+    }
+
+    override suspend fun deleteCustomProduct(productId: String) {
+        dao.deleteCustomProductById(productId)
+    }
+
+    override suspend fun updateCustomProduct(product: Product) {
+        val entity = CustomProductEntity(
+            id = product.id,
+            name = product.name,
+            brand = product.brand,
+            calories = product.calories,
+            protein = product.protein,
+            fat = product.fat,
+            carbs = product.carbs
+        )
+        dao.updateCustomProduct(entity)
+    }
+    override suspend fun deleteDiaryEntry(entryId: Int) {
+        dao.deleteDiaryEntryById(entryId)
+    }
+
+    override suspend fun updateDiaryEntryWeight(entryId: Int, newAmountGrams: Int) {
+        dao.updateDiaryEntryGrams(entryId, newAmountGrams)
     }
 }
 

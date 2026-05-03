@@ -35,14 +35,26 @@ interface FoodDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCustomProduct(product: CustomProductEntity)
 
-    @Query("SELECT * FROM custom_products WHERE name LIKE '%' || :query || '%'")
+    @Query("SELECT * FROM custom_products WHERE name LIKE '%' || :query || '%' OR brand LIKE '%' || :query || '%'")
     suspend fun searchCustomProducts(query: String): List<CustomProductEntity>
+
+    @Query("DELETE FROM custom_products WHERE id = :productId")
+    suspend fun deleteCustomProductById(productId: String)
+
+    @Update
+    suspend fun updateCustomProduct(product: CustomProductEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDiaryEntry(entry: DiaryEntryEntity)
 
     @Query("SELECT * FROM diary_entries WHERE timestamp BETWEEN :startOfDay AND :endOfDay ORDER BY timestamp DESC")
     fun getDiaryEntries(startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntryEntity>>
+
+    @Query("DELETE FROM diary_entries WHERE id = :entryId")
+    suspend fun deleteDiaryEntryById(entryId: Int)
+
+    @Query("UPDATE diary_entries SET amountGrams = :newAmount WHERE id = :entryId")
+    suspend fun updateDiaryEntryGrams(entryId: Int, newAmount: Int)
 }
 
 @Database(entities = [CustomProductEntity::class, DiaryEntryEntity::class], version = 2, exportSchema = false)
