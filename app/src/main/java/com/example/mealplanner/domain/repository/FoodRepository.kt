@@ -19,4 +19,12 @@ interface FoodRepository {
 
     suspend fun deleteDiaryEntry(entryId: Int)
     suspend fun updateDiaryEntryWeight(entryId: Int, newAmountGrams: Int)
+
+    fun getCustomProductsFlow(): Flow<List<Product>>
+
+    fun getRecipesFlow(): Flow<List<Product>>
+    suspend fun saveRecipe(product: Product)
+    suspend fun deleteRecipe(recipeId: String)
+
+    suspend fun getRecipeById(id: String): Result<Product?>
 }

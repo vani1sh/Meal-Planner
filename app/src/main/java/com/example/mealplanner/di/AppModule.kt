@@ -2,6 +2,8 @@ package com.example.mealplanner.di
 
 import android.app.Application
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.mealplanner.data.local.AppDatabase
 import com.example.mealplanner.data.local.FoodDao
 import com.example.mealplanner.data.remote.OpenFoodFactsApi
@@ -29,6 +31,27 @@ object AppModule {
             .create(OpenFoodFactsApi::class.java)
     }
 
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                "CREATE TABLE IF NOT EXISTS `recipes` (" +
+                        "`id` TEXT NOT NULL, " +
+                        "`name` TEXT NOT NULL, " +
+                        "`calories` REAL NOT NULL, " +
+                        "`protein` REAL NOT NULL, " +
+                        "`fat` REAL NOT NULL, " +
+                        "`carbs` REAL NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
+            )
+        }
+    }
+
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("ALTER TABLE recipes ADD COLUMN ingredientsJson TEXT NOT NULL DEFAULT '[]'")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAppDatabase(app: Application): AppDatabase {
@@ -36,7 +59,9 @@ object AppModule {
             app,
             AppDatabase::class.java,
             "meal_planner_db"
-        ).fallbackToDestructiveMigration().build()
+        ).addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+            //.fallbackToDestructiveMigration()
+            .build()
     }
 
     @Provides

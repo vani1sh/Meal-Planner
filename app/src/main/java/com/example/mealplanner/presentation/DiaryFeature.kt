@@ -1,11 +1,10 @@
-package com.example.mealplanner.presentation.diary
+package com.example.mealplanner.presentation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -14,7 +13,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-//import androidx.compose.runtime.saveable.rememberSaveable
+// import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +27,7 @@ import com.example.mealplanner.domain.model.DiaryEntry
 import com.example.mealplanner.domain.model.MealType
 import com.example.mealplanner.domain.repository.FoodRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -53,7 +53,7 @@ class DiaryViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(DiaryUiState())
     val uiState: StateFlow<DiaryUiState> = _uiState.asStateFlow()
-    private var diaryJob: kotlinx.coroutines.Job? = null
+    private var diaryJob: Job? = null
 
     init {
         loadDiaryForDate(_uiState.value.currentDate)
@@ -98,6 +98,7 @@ class DiaryViewModel @Inject constructor(
         loadDiaryForDate(newDate)
     }
 }
+
 
 @Composable
 fun DiaryScreen(

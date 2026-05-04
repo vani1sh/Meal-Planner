@@ -1,4 +1,4 @@
-package com.example.mealplanner.presentation.create_product
+package com.example.mealplanner.presentation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -67,6 +67,7 @@ class CreateProductViewModel @Inject constructor(
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateProductScreen(
@@ -103,13 +104,6 @@ fun CreateProductScreen(
                 .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
-            Text(
-                "Укажите пищевую ценность на 100 грамм продукта",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -122,8 +116,15 @@ fun CreateProductScreen(
                 value = brand,
                 onValueChange = { brand = it },
                 label = { Text("Бренд (опционально)") },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                 singleLine = true
+            )
+
+            Text(
+                "Укажите пищевую ценность на 100 грамм продукта",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

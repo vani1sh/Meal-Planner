@@ -1,4 +1,4 @@
-package com.example.mealplanner.presentation.calendar
+package com.example.mealplanner.presentation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

@@ -1,8 +1,9 @@
 package com.example.mealplanner.data.repository
 
-import com.example.mealplanner.data.local.CustomProductEntity
-import com.example.mealplanner.data.local.DiaryEntryEntity
+import com.example.mealplanner.data.local.entity.CustomProductEntity
+import com.example.mealplanner.data.local.entity.DiaryEntryEntity
 import com.example.mealplanner.data.local.FoodDao
+import com.example.mealplanner.data.local.entity.RecipeEntity
 import com.example.mealplanner.data.remote.OpenFoodFactsApi
 import com.example.mealplanner.data.remote.ProductDto
 import com.example.mealplanner.domain.model.DiaryEntry
@@ -37,8 +38,10 @@ class FoodRepositoryImpl(
     }
 
     override suspend fun saveCustomProduct(product: Product) {
+        dao.deleteDuplicates(product.name, product.brand)
+
         val entity = CustomProductEntity(
-            id = UUID.randomUUID().toString(),
+            id = product.id,
             name = product.name,
             brand = product.brand,
             calories = product.calories,
@@ -94,7 +97,44 @@ class FoodRepositoryImpl(
     override suspend fun updateDiaryEntryWeight(entryId: Int, newAmountGrams: Int) {
         dao.updateDiaryEntryGrams(entryId, newAmountGrams)
     }
+
+    override fun getCustomProductsFlow(): Flow<List<Product>> {
+        return dao.getAllCustomProductsFlow().map { entities ->
+            entities.map { it.toDomain() }
+                .distinctBy {
+                    val nameRaw = it.name.lowercase().replace("\\s+".toRegex(), "")
+                    val brandRaw = it.brand?.lowercase()?.replace("\\s+".toRegex(), "") ?: ""
+                    "$nameRaw-$brandRaw"
+                }
+        }
+    }
+
+    override fun getRecipesFlow(): Flow<List<Product>> {
+        return dao.getAllRecipesFlow().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun saveRecipe(product: Product) {
+        dao.deleteRecipeDuplicates(product.name)
+        val entity = RecipeEntity(
+            id = product.id, name = product.name, calories = product.calories,
+            protein = product.protein, fat = product.fat, carbs = product.carbs,
+            ingredientsJson = product.recipeIngredientsJson ?: "[]"
+        )
+        dao.insertRecipe(entity)
+    }
+
+    override suspend fun deleteRecipe(recipeId: String) {
+        dao.deleteRecipeById(recipeId)
+    }
+
+    override suspend fun getRecipeById(id: String): Result<Product?> {
+        return try { Result.success(dao.getRecipeById(id)?.toDomain()) }
+        catch (e: Exception) { Result.failure(e) }
+    }
 }
+
 
 fun ProductDto.toDomain(): Product? {
     if (productName.isNullOrBlank()) return null

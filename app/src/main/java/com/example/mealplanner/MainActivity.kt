@@ -17,13 +17,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.mealplanner.presentation.add_product.AddProductScreen
-import com.example.mealplanner.presentation.add_product.AddProductViewModel
-import com.example.mealplanner.presentation.calendar.CalendarScreen
-import com.example.mealplanner.presentation.create_product.CreateProductScreen
-import com.example.mealplanner.presentation.create_product.CreateProductViewModel
-import com.example.mealplanner.presentation.diary.DiaryScreen
-import com.example.mealplanner.presentation.diary.DiaryViewModel
+import com.example.mealplanner.domain.model.Product
+import com.example.mealplanner.presentation.AddProductScreen
+import com.example.mealplanner.presentation.AddProductViewModel
+import com.example.mealplanner.presentation.CalendarScreen
+import com.example.mealplanner.presentation.CreateProductScreen
+import com.example.mealplanner.presentation.CreateProductViewModel
+import com.example.mealplanner.presentation.CreateRecipeScreen
+import com.example.mealplanner.presentation.CreateRecipeViewModel
+import com.example.mealplanner.presentation.DiaryScreen
+import com.example.mealplanner.presentation.DiaryViewModel
+import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -83,25 +87,41 @@ fun MealPlannerNavGraph() {
         }
 
         composable(
-            route = "add_product/{timestamp}/{mealType}",
+            route = "add_product/{timestamp}/{mealType}?isPicker={isPicker}",
             arguments = listOf(
                 navArgument("timestamp") { type = NavType.LongType },
-                navArgument("mealType") { type = NavType.StringType }
+                navArgument("mealType") { type = NavType.StringType },
+                navArgument("isPicker") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
             )
         ) { backStackEntry ->
             val timestamp = backStackEntry.arguments?.getLong("timestamp") ?: 0L
             val mealType = backStackEntry.arguments?.getString("mealType") ?: ""
+            val isPicker = backStackEntry.arguments?.getBoolean("isPicker") ?: false
 
             val viewModel: AddProductViewModel = hiltViewModel()
             AddProductScreen(
                 viewModel = viewModel,
+                isPicker = isPicker,
+                onProductPickedForRecipe = { product, grams ->
+                    val gson = com.google.gson.Gson()
+                    navController.previousBackStackEntry?.savedStateHandle?.set("picked_product", gson.toJson(product))
+                    navController.previousBackStackEntry?.savedStateHandle?.set("picked_weight", grams)
+                    navController.popBackStack()
+                },
                 onBack = { navController.popBackStack() },
-                onNavigateToCreateProduct = { navController.navigate("create_product/$timestamp/$mealType") }
+                onNavigateToCreateProduct = { navController.navigate("create_product/$timestamp/$mealType") },
+                onNavigateToCreateRecipe = { navController.navigate("create_recipe/$timestamp/$mealType") },
+                onEditRecipeClick = { recipeId ->
+                    navController.navigate("create_recipe/$timestamp/$mealType?recipeId=$recipeId")
+                }
             )
         }
 
         composable(
-            route = "create_product/{timestamp}/{mealType}",
+            route = "create_product/{timestamp}/{mealType}?isPicker={isPicker}",
             arguments = listOf(
                 navArgument("timestamp") { type = NavType.LongType },
                 navArgument("mealType") { type = NavType.StringType }
@@ -112,6 +132,43 @@ fun MealPlannerNavGraph() {
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onNavigateBackToDiary = {
+                    navController.popBackStack("diary", inclusive = false)
+                }
+            )
+        }
+
+        composable(
+            route = "create_recipe/{timestamp}/{mealType}?recipeId={recipeId}",
+            arguments = listOf(
+                navArgument("timestamp") { type = NavType.LongType },
+                navArgument("mealType") { type = NavType.StringType },
+                navArgument("recipeId") { type = NavType.StringType; nullable = true; defaultValue = null }
+            )
+        ) { backStackEntry ->
+            val viewModel: CreateRecipeViewModel = hiltViewModel()
+
+            val savedStateHandle = backStackEntry.savedStateHandle
+            val pickedProductJson by savedStateHandle.getStateFlow<String?>("picked_product", null).collectAsStateWithLifecycle()
+            val pickedWeight by savedStateHandle.getStateFlow<Int>("picked_weight", 0).collectAsStateWithLifecycle()
+
+            LaunchedEffect(pickedProductJson, pickedWeight) {
+                if (pickedProductJson != null && pickedWeight > 0) {
+                    val gson = com.google.gson.Gson()
+                    val product = gson.fromJson(pickedProductJson, Product::class.java)
+                    viewModel.addIngredient(product, pickedWeight)
+
+                    savedStateHandle.remove<String>("picked_product")
+                    savedStateHandle.remove<Int>("picked_weight")
+                }
+            }
+
+            CreateRecipeScreen(
+                viewModel = viewModel,
+                onNavigateToPickIngredient = {
+                    navController.navigate("add_product/0/SNACK?isPicker=true")
+                },
+                onBack = { navController.popBackStack() },
+                onSuccess = {
                     navController.popBackStack("diary", inclusive = false)
                 }
             )

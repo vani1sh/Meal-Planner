@@ -1,24 +1,6 @@
 package com.example.mealplanner.domain.model
 
 
-data class Product(
-    val id: String,
-    val name: String,
-    val brand: String?,
-    val calories: Float,
-    val protein: Float,
-    val fat: Float,
-    val carbs: Float,
-    val isCustom: Boolean
-)
-
-enum class MealType(val displayName: String) {
-    BREAKFAST("Завтрак"),
-    LUNCH("Обед"),
-    DINNER("Ужин"),
-    SNACK("Перекус")
-}
-
 data class DiaryEntry(
     val id: Int = 0,
     val product: Product,

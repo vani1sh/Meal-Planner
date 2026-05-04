@@ -23,6 +23,7 @@ data class NutrimentsDto(
     @SerializedName("carbohydrates_100g") val carbs: Float?
 )
 
+
 interface OpenFoodFactsApi {
     @GET("cgi/search.pl?search_simple=1&action=process&json=1")
     suspend fun searchProducts(
