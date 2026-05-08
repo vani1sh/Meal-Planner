@@ -34,7 +34,7 @@ class AddProductViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val selectedTimestamp: Long = savedStateHandle.get<Long>("timestamp") ?: System.currentTimeMillis()
+    val selectedTimestamp: Long = savedStateHandle.get<Long>("timestamp") ?: System.currentTimeMillis()
     private val selectedMealType: String = savedStateHandle.get<String>("mealType") ?: MealType.SNACK.name
 
     private val _searchQuery = MutableStateFlow("")
@@ -80,6 +80,12 @@ class AddProductViewModel @Inject constructor(
                 )
             )
             onSuccess()
+        }
+    }
+
+    fun addProductToShoppingList(product: Product, amountGrams: Int) {
+        viewModelScope.launch {
+            repository.addProductToShoppingList(product, amountGrams)
         }
     }
 
@@ -258,8 +264,9 @@ fun AddProductScreen(
     selectedProductForDiary?.let { product ->
         WeightInputDialog(
             product = product,
+            selectedDateTimestamp = viewModel.selectedTimestamp,
             onDismiss = { selectedProductForDiary = null },
-            onConfirm = { grams ->
+            onConfirm = { grams, addToShoppingList ->
                 if (isPicker) {
                     onProductPickedForRecipe(product, grams)
                     selectedProductForDiary = null
@@ -268,6 +275,9 @@ fun AddProductScreen(
                         selectedProductForDiary = null
                         onBack()
                     })
+                    if (addToShoppingList) {
+                        viewModel.addProductToShoppingList(product, grams)
+                    }
                 }
             }
         )

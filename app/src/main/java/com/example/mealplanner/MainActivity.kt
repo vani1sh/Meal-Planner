@@ -3,18 +3,33 @@ package com.example.mealplanner
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.mealplanner.domain.model.Product
@@ -27,6 +42,7 @@ import com.example.mealplanner.presentation.CreateRecipeScreen
 import com.example.mealplanner.presentation.CreateRecipeViewModel
 import com.example.mealplanner.presentation.DiaryScreen
 import com.example.mealplanner.presentation.DiaryViewModel
+import com.example.mealplanner.presentation.ShoppingListScreen
 import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -40,7 +56,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MealPlannerNavGraph()
+                    MealPlannerAppContent()
                 }
             }
         }
@@ -48,8 +64,59 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MealPlannerNavGraph() {
+fun MealPlannerAppContent() {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    val showBottomBar = currentRoute == "diary" || currentRoute == "shopping_list"
+
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                NavigationBar {
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.List, contentDescription = "Дневник") },
+                        label = { Text("Дневник") },
+                        selected = currentRoute == "diary",
+                        onClick = {
+                            if (currentRoute != "diary") {
+                                navController.navigate("diary") {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        }
+                    )
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Покупки") },
+                        label = { Text("Список покупок") },
+                        selected = currentRoute == "shopping_list",
+                        onClick = {
+                            if (currentRoute != "shopping_list") {
+                                navController.navigate("shopping_list") {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    ) { paddingValues ->
+        val contentPadding = if (showBottomBar) paddingValues else PaddingValues(0.dp)
+        Box(modifier = Modifier.padding(contentPadding)) {
+            MealPlannerNavGraph(navController = navController)
+        }
+    }
+}
+
+@Composable
+fun MealPlannerNavGraph(navController: NavHostController) {
+    //val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = "diary") {
         composable("diary") { backStackEntry ->
@@ -74,6 +141,10 @@ fun MealPlannerNavGraph() {
                     navController.navigate("calendar")
                 }
             )
+        }
+
+        composable("shopping_list") {
+            ShoppingListScreen(viewModel = hiltViewModel())
         }
 
         composable("calendar") {

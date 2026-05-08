@@ -4,6 +4,7 @@ import androidx.room.*
 import com.example.mealplanner.data.local.entity.CustomProductEntity
 import com.example.mealplanner.data.local.entity.DiaryEntryEntity
 import com.example.mealplanner.data.local.entity.RecipeEntity
+import com.example.mealplanner.data.local.entity.ShoppingListItemEntity
 import kotlinx.coroutines.flow.Flow
 
 
@@ -62,15 +63,28 @@ interface FoodDao {
 
     @Query("SELECT * FROM recipes WHERE id = :id LIMIT 1")
     suspend fun getRecipeById(id: String): RecipeEntity?
+
+    @Query("SELECT * FROM shopping_list")
+    fun getShoppingList(): Flow<List<ShoppingListItemEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertShoppingListItem(item: ShoppingListItemEntity)
+
+    @Update
+    suspend fun updateShoppingListItem(item: ShoppingListItemEntity)
+
+    @Delete
+    suspend fun deleteShoppingListItem(item: ShoppingListItemEntity)
 }
 
 
 @Database(entities = [
     CustomProductEntity::class,
     DiaryEntryEntity::class,
-    RecipeEntity::class
+    RecipeEntity::class,
+    ShoppingListItemEntity::class
     ],
-    version = 4, exportSchema = false)
+    version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun foodDao(): FoodDao
 }

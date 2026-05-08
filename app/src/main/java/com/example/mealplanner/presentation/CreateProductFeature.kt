@@ -31,12 +31,12 @@ class CreateProductViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val selectedTimestamp: Long = savedStateHandle.get<Long>("timestamp") ?: System.currentTimeMillis()
+    val selectedTimestamp: Long = savedStateHandle.get<Long>("timestamp") ?: System.currentTimeMillis()
     private val selectedMealType: String = savedStateHandle.get<String>("mealType") ?: MealType.SNACK.name
 
     fun saveProductAndAddToDiary(
         name: String, brand: String, calories: String, protein: String, fat: String, carbs: String,
-        amountGrams: Int, onSuccess: () -> Unit
+        amountGrams: Int, addToShoppingList: Boolean, onSuccess: () -> Unit
     ) {
         if (name.isBlank()) return
 
@@ -62,6 +62,11 @@ class CreateProductViewModel @Inject constructor(
                     mealType = MealType.valueOf(selectedMealType)
                 )
             )
+
+            if (addToShoppingList) {
+                repository.addProductToShoppingList(newProduct, amountGrams)
+            }
+
             onSuccess()
         }
     }
@@ -186,13 +191,15 @@ fun CreateProductScreen(
 
         WeightInputDialog(
             product = tempProduct,
+            selectedDateTimestamp = viewModel.selectedTimestamp,
             onDismiss = { showWeightDialog = false },
-            onConfirm = { grams ->
+            onConfirm = { grams, addToShoppingList ->
                 showWeightDialog = false
                 viewModel.saveProductAndAddToDiary(
                     name = name, brand = brand, calories = calories,
                     protein = protein, fat = fat, carbs = carbs,
                     amountGrams = grams,
+                    addToShoppingList = addToShoppingList,
                     onSuccess = onNavigateBackToDiary
                 )
             }

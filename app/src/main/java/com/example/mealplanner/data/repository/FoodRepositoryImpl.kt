@@ -2,6 +2,7 @@ package com.example.mealplanner.data.repository
 
 import com.example.mealplanner.data.local.entity.CustomProductEntity
 import com.example.mealplanner.data.local.entity.DiaryEntryEntity
+import com.example.mealplanner.data.local.entity.ShoppingListItemEntity
 import com.example.mealplanner.data.local.FoodDao
 import com.example.mealplanner.data.local.entity.RecipeEntity
 import com.example.mealplanner.data.remote.OpenFoodFactsApi
@@ -9,7 +10,10 @@ import com.example.mealplanner.data.remote.ProductDto
 import com.example.mealplanner.domain.model.DiaryEntry
 import com.example.mealplanner.domain.model.MealType
 import com.example.mealplanner.domain.model.Product
+import com.example.mealplanner.domain.model.RecipeIngredient
 import com.example.mealplanner.domain.repository.FoodRepository
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -133,8 +137,42 @@ class FoodRepositoryImpl(
         return try { Result.success(dao.getRecipeById(id)?.toDomain()) }
         catch (e: Exception) { Result.failure(e) }
     }
-}
 
+    override fun getShoppingList(): Flow<List<ShoppingListItemEntity>> = dao.getShoppingList()
+
+    override suspend fun insertShoppingListItem(item: ShoppingListItemEntity) = dao.insertShoppingListItem(item)
+
+    override suspend fun updateShoppingListItem(item: ShoppingListItemEntity) = dao.updateShoppingListItem(item)
+
+    override suspend fun deleteShoppingListItem(item: ShoppingListItemEntity) = dao.deleteShoppingListItem(item)
+
+    override suspend fun addProductToShoppingList(product: Product, amountGrams: Int) {
+        if (product.isRecipe && product.recipeIngredientsJson != null) {
+            val type = object : TypeToken<List<RecipeIngredient>>() {}.type
+            val ingredients: List<RecipeIngredient> = Gson().fromJson(product.recipeIngredientsJson, type)
+
+            val ratio = amountGrams / 100f
+
+            ingredients.forEach { ingredient ->
+                val calculatedAmount = (ingredient.amountGrams * ratio).toInt()
+                dao.insertShoppingListItem(
+                    ShoppingListItemEntity(
+                        name = ingredient.product.name,
+                        amountGrams = calculatedAmount,
+                        note = "Рецепт ${product.name}"
+                    )
+                )
+            }
+        } else {
+            dao.insertShoppingListItem(
+                ShoppingListItemEntity(
+                    name = product.name,
+                    amountGrams = amountGrams
+                )
+            )
+        }
+    }
+}
 
 fun ProductDto.toDomain(): Product? {
     if (productName.isNullOrBlank()) return null
