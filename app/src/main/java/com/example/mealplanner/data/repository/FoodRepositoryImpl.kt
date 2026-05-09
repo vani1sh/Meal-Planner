@@ -22,10 +22,9 @@ class FoodRepositoryImpl(
     private val api: OpenFoodFactsApi,
     private val dao: FoodDao
 ) : FoodRepository {
-
-    override suspend fun searchProducts(query: String): Result<List<Product>> {
+    override suspend fun searchProducts(query: String, userId: String): Result<List<Product>> {
         return try {
-            val localProducts = dao.searchCustomProducts(query).map { it.toDomain() }
+            val localProducts = dao.searchCustomProducts(query, userId).map { it.toDomain() }
 
             val remoteProducts = api.searchProducts(query).products.mapNotNull { it.toDomain() }
 
@@ -41,11 +40,13 @@ class FoodRepositoryImpl(
         }
     }
 
-    override suspend fun saveCustomProduct(product: Product) {
-        dao.deleteDuplicates(product.name, product.brand)
+    // CustomProduct
+    override suspend fun saveCustomProduct(product: Product, userId: String) {
+        dao.deleteCustomDuplicates(product.name, product.brand, userId)
 
         val entity = CustomProductEntity(
             id = product.id,
+            userId = userId,
             name = product.name,
             brand = product.brand,
             calories = product.calories,
@@ -56,35 +57,14 @@ class FoodRepositoryImpl(
         dao.insertCustomProduct(entity)
     }
 
-    override fun getDiaryForDate(startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntry>> {
-        return dao.getDiaryEntries(startOfDay, endOfDay).map { entities ->
-            entities.map { it.toDomain() }
-        }
+    override suspend fun deleteCustomProduct(productId: String, userId: String) {
+        dao.deleteCustomProductById(productId, userId)
     }
 
-    override suspend fun addDiaryEntry(entry: DiaryEntry) {
-        val entity = DiaryEntryEntity(
-            productId = entry.product.id,
-            isCustomProduct = entry.product.isCustom,
-            amountGrams = entry.amountGrams,
-            timestamp = entry.timestamp,
-            mealType = entry.mealType.name,
-            snapshotName = entry.product.name,
-            snapshotCalories = entry.product.calories,
-            snapshotProtein = entry.product.protein,
-            snapshotFat = entry.product.fat,
-            snapshotCarbs = entry.product.carbs
-        )
-        dao.insertDiaryEntry(entity)
-    }
-
-    override suspend fun deleteCustomProduct(productId: String) {
-        dao.deleteCustomProductById(productId)
-    }
-
-    override suspend fun updateCustomProduct(product: Product) {
+    override suspend fun updateCustomProduct(product: Product, userId: String) {
         val entity = CustomProductEntity(
             id = product.id,
+            userId = userId,
             name = product.name,
             brand = product.brand,
             calories = product.calories,
@@ -94,16 +74,9 @@ class FoodRepositoryImpl(
         )
         dao.updateCustomProduct(entity)
     }
-    override suspend fun deleteDiaryEntry(entryId: Int) {
-        dao.deleteDiaryEntryById(entryId)
-    }
 
-    override suspend fun updateDiaryEntryWeight(entryId: Int, newAmountGrams: Int) {
-        dao.updateDiaryEntryGrams(entryId, newAmountGrams)
-    }
-
-    override fun getCustomProductsFlow(): Flow<List<Product>> {
-        return dao.getAllCustomProductsFlow().map { entities ->
+    override fun getCustomProductsFlow(userId: String): Flow<List<Product>> {
+        return dao.getAllCustomProductsFlow(userId).map { entities ->
             entities.map { it.toDomain() }
                 .distinctBy {
                     val nameRaw = it.name.lowercase().replace("\\s+".toRegex(), "")
@@ -113,32 +86,55 @@ class FoodRepositoryImpl(
         }
     }
 
-    override fun getRecipesFlow(): Flow<List<Product>> {
-        return dao.getAllRecipesFlow().map { entities ->
+    // Diary
+    override fun getDiaryForDate(userId: String, startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntry>> {
+        return dao.getDiaryEntriesForUser(userId, startOfDay, endOfDay).map { entities ->
             entities.map { it.toDomain() }
         }
     }
 
-    override suspend fun saveRecipe(product: Product) {
-        dao.deleteRecipeDuplicates(product.name)
+    override suspend fun addDiaryEntry(entry: DiaryEntry, userId: String) {
+        dao.insertDiaryEntry(entry.toEntity(userId))
+    }
+
+    override suspend fun deleteDiaryEntry(entryId: Int, userId: String) {
+        dao.deleteDiaryEntry(entryId, userId)
+    }
+
+    override suspend fun updateDiaryEntryWeight(entryId: Int, newAmountGrams: Int, userId: String) {
+        dao.updateDiaryEntryGrams(entryId, newAmountGrams, userId)
+    }
+
+    // Recipe
+    override fun getRecipesFlow(userId: String): Flow<List<Product>> {
+        return dao.getAllRecipesFlow(userId).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun saveRecipe(product: Product, userId: String) {
+        dao.deleteRecipeDuplicates(product.name, userId)
         val entity = RecipeEntity(
-            id = product.id, name = product.name, calories = product.calories,
-            protein = product.protein, fat = product.fat, carbs = product.carbs,
+            id = product.id,
+            userId = userId,
+            name = product.name,
+            calories = product.calories, protein = product.protein, fat = product.fat, carbs = product.carbs,
             ingredientsJson = product.recipeIngredientsJson ?: "[]"
         )
         dao.insertRecipe(entity)
     }
 
-    override suspend fun deleteRecipe(recipeId: String) {
-        dao.deleteRecipeById(recipeId)
+    override suspend fun deleteRecipe(recipeId: String, userId: String) {
+        dao.deleteRecipeById(recipeId, userId)
     }
 
-    override suspend fun getRecipeById(id: String): Result<Product?> {
-        return try { Result.success(dao.getRecipeById(id)?.toDomain()) }
+    override suspend fun getRecipeById(id: String, userId: String): Result<Product?> {
+        return try { Result.success(dao.getRecipeById(id, userId)?.toDomain()) }
         catch (e: Exception) { Result.failure(e) }
     }
 
-    override fun getShoppingList(): Flow<List<ShoppingListItemEntity>> = dao.getShoppingList()
+    // ShoppingList
+    override fun getShoppingList(userId: String): Flow<List<ShoppingListItemEntity>> = dao.getShoppingList(userId)
 
     override suspend fun insertShoppingListItem(item: ShoppingListItemEntity) = dao.insertShoppingListItem(item)
 
@@ -146,7 +142,7 @@ class FoodRepositoryImpl(
 
     override suspend fun deleteShoppingListItem(item: ShoppingListItemEntity) = dao.deleteShoppingListItem(item)
 
-    override suspend fun addProductToShoppingList(product: Product, amountGrams: Int) {
+    override suspend fun addProductToShoppingList(product: Product, amountGrams: Int, userId: String) {
         if (product.isRecipe && product.recipeIngredientsJson != null) {
             val type = object : TypeToken<List<RecipeIngredient>>() {}.type
             val ingredients: List<RecipeIngredient> = Gson().fromJson(product.recipeIngredientsJson, type)
@@ -157,6 +153,7 @@ class FoodRepositoryImpl(
                 val calculatedAmount = (ingredient.amountGrams * ratio).toInt()
                 dao.insertShoppingListItem(
                     ShoppingListItemEntity(
+                        userId = userId,
                         name = ingredient.product.name,
                         amountGrams = calculatedAmount,
                         note = "Рецепт ${product.name}"
@@ -166,6 +163,7 @@ class FoodRepositoryImpl(
         } else {
             dao.insertShoppingListItem(
                 ShoppingListItemEntity(
+                    userId = userId,
                     name = product.name,
                     amountGrams = amountGrams
                 )
@@ -203,4 +201,19 @@ fun DiaryEntryEntity.toDomain() = DiaryEntry(
         calories = snapshotCalories, protein = snapshotProtein,
         fat = snapshotFat, carbs = snapshotCarbs, isCustom = isCustomProduct
     )
+)
+
+fun DiaryEntry.toEntity(userId: String) = DiaryEntryEntity(
+    id = id,
+    userId = userId,
+    productId = product.id,
+    isCustomProduct = product.isCustom,
+    amountGrams = amountGrams,
+    timestamp = timestamp,
+    mealType = mealType.name,
+    snapshotName = product.name,
+    snapshotCalories = product.calories,
+    snapshotProtein = product.protein,
+    snapshotFat = product.fat,
+    snapshotCarbs = product.carbs
 )

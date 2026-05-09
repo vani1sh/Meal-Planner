@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "diary_entries")
 data class DiaryEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val userId: String,
     val productId: String,
     val isCustomProduct: Boolean,
     val amountGrams: Int,

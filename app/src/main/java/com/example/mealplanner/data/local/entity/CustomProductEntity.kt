@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "custom_products")
 data class CustomProductEntity(
     @PrimaryKey val id: String,
+    val userId: String,
     val name: String,
     val brand: String?,
     val calories: Float,

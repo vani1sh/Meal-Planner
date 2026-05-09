@@ -3,27 +3,41 @@ package com.example.mealplanner
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -33,6 +47,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.mealplanner.domain.model.Product
+import com.example.mealplanner.domain.repository.AuthRepository
 import com.example.mealplanner.presentation.AddProductScreen
 import com.example.mealplanner.presentation.AddProductViewModel
 import com.example.mealplanner.presentation.CalendarScreen
@@ -43,8 +58,15 @@ import com.example.mealplanner.presentation.CreateRecipeViewModel
 import com.example.mealplanner.presentation.DiaryScreen
 import com.example.mealplanner.presentation.DiaryViewModel
 import com.example.mealplanner.presentation.ShoppingListScreen
+import com.example.mealplanner.presentation.auth.AuthScreen
+import com.example.mealplanner.presentation.components.SplashViewModel
+import com.example.mealplanner.presentation.onboarding.OnboardingScreen
 import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -63,15 +85,59 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val authRepository: AuthRepository
+) : ViewModel() {
+    fun logout(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            authRepository.logout()
+            onSuccess()
+        }
+    }
+}
+
 @Composable
-fun MealPlannerAppContent() {
+fun MealPlannerAppContent(
+    mainViewModel: MainViewModel = hiltViewModel()
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
     val showBottomBar = currentRoute == "diary" || currentRoute == "shopping_list"
 
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Выход из аккаунта") },
+            text = { Text("Вы уверены, что хотите выйти из приложения?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                        mainViewModel.logout {
+                            navController.navigate("splash") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    }
+                ) {
+                    Text("Выйти", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar {
@@ -103,12 +169,37 @@ fun MealPlannerAppContent() {
                             }
                         }
                     )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 16.dp),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        IconButton(
+                            onClick = { showLogoutDialog = true },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "Выход",
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
                 }
             }
         }
     ) { paddingValues ->
-        val contentPadding = if (showBottomBar) paddingValues else PaddingValues(0.dp)
-        Box(modifier = Modifier.padding(contentPadding)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = if (showBottomBar) paddingValues.calculateBottomPadding() else 0.dp)
+        ) {
             MealPlannerNavGraph(navController = navController)
         }
     }
@@ -118,7 +209,49 @@ fun MealPlannerAppContent() {
 fun MealPlannerNavGraph(navController: NavHostController) {
     //val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "diary") {
+    NavHost(navController = navController, startDestination = "splash", modifier = Modifier.fillMaxSize()) {
+
+        composable("splash") {
+            val viewModel: SplashViewModel = hiltViewModel()
+            val startRoute by viewModel.startRoute.collectAsStateWithLifecycle()
+
+            LaunchedEffect(Unit) {
+                viewModel.checkAuthState()
+            }
+
+            LaunchedEffect(startRoute) {
+                startRoute?.let { route ->
+                    navController.navigate(route) {
+                        popUpTo("splash") { inclusive = true }
+                    }
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+
+        composable("auth") {
+            AuthScreen(
+                onAuthSuccess = {
+                    navController.navigate("splash") {
+                        popUpTo("auth") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable("onboarding") {
+            OnboardingScreen(
+                onFinishOnboarding = {
+                    navController.navigate("diary") {
+                        popUpTo("onboarding") { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable("diary") { backStackEntry ->
             val viewModel: DiaryViewModel = hiltViewModel()
 
@@ -240,7 +373,7 @@ fun MealPlannerNavGraph(navController: NavHostController) {
                 },
                 onBack = { navController.popBackStack() },
                 onSuccess = {
-                    navController.popBackStack("diary", inclusive = false)
+                    navController.popBackStack() //popBackStack("diary", inclusive = false)
                 }
             )
         }

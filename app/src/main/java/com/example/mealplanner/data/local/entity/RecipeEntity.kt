@@ -8,6 +8,7 @@ import com.example.mealplanner.domain.model.Product
 @Entity(tableName = "recipes")
 data class RecipeEntity(
     @PrimaryKey val id: String,
+    val userId: String,
     val name: String,
     val calories: Float,
     val protein: Float,

@@ -7,32 +7,30 @@ import kotlinx.coroutines.flow.Flow
 
 
 interface FoodRepository {
-    suspend fun searchProducts(query: String): Result<List<Product>>
+    suspend fun searchProducts(query: String, userId: String): Result<List<Product>>
 
-    suspend fun saveCustomProduct(product: Product)
+    // CustomProduct
+    suspend fun saveCustomProduct(product: Product, userId: String)
+    suspend fun deleteCustomProduct(productId: String, userId: String)
+    suspend fun updateCustomProduct(product: Product, userId: String)
+    fun getCustomProductsFlow(userId: String): Flow<List<Product>>
 
-    suspend fun deleteCustomProduct(productId: String)
-    suspend fun updateCustomProduct(product: Product)
+    // Diary
+    fun getDiaryForDate(userId: String, startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntry>>
+    suspend fun addDiaryEntry(entry: DiaryEntry, userId: String)
+    suspend fun deleteDiaryEntry(entryId: Int, userId: String)
+    suspend fun updateDiaryEntryWeight(entryId: Int, newAmountGrams: Int, userId: String)
 
-    fun getDiaryForDate(startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntry>>
+    // Recipe
+    fun getRecipesFlow(userId: String): Flow<List<Product>>
+    suspend fun saveRecipe(product: Product, userId: String)
+    suspend fun deleteRecipe(recipeId: String, userId: String)
+    suspend fun getRecipeById(id: String, userId: String): Result<Product?>
 
-    suspend fun addDiaryEntry(entry: DiaryEntry)
-
-    suspend fun deleteDiaryEntry(entryId: Int)
-    suspend fun updateDiaryEntryWeight(entryId: Int, newAmountGrams: Int)
-
-    fun getCustomProductsFlow(): Flow<List<Product>>
-
-    fun getRecipesFlow(): Flow<List<Product>>
-    suspend fun saveRecipe(product: Product)
-    suspend fun deleteRecipe(recipeId: String)
-
-    suspend fun getRecipeById(id: String): Result<Product?>
-
-    fun getShoppingList(): Flow<List<ShoppingListItemEntity>>
+    // ShoppingList
+    fun getShoppingList(userId: String): Flow<List<ShoppingListItemEntity>>
     suspend fun insertShoppingListItem(item: ShoppingListItemEntity)
     suspend fun updateShoppingListItem(item: ShoppingListItemEntity)
     suspend fun deleteShoppingListItem(item: ShoppingListItemEntity)
-
-    suspend fun addProductToShoppingList(product: Product, amountGrams: Int)
+    suspend fun addProductToShoppingList(product: Product, amountGrams: Int, userId: String)
 }

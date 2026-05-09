@@ -21,6 +21,7 @@ import com.example.mealplanner.domain.model.DiaryEntry
 import com.example.mealplanner.domain.model.MealType
 import com.example.mealplanner.domain.model.Product
 import com.example.mealplanner.domain.model.RecipeIngredient
+import com.example.mealplanner.domain.repository.AuthRepository
 import com.example.mealplanner.domain.repository.FoodRepository
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -33,6 +34,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CreateRecipeViewModel @Inject constructor(
     private val repository: FoodRepository,
+    private val authRepository: AuthRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -51,7 +53,9 @@ class CreateRecipeViewModel @Inject constructor(
     init {
         editingRecipeId?.let { id ->
             viewModelScope.launch {
-                repository.getRecipeById(id).getOrNull()?.let { recipe ->
+                val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+
+                repository.getRecipeById(id, userId).getOrNull()?.let { recipe ->
                     recipeName = recipe.name
                     if (!recipe.recipeIngredientsJson.isNullOrBlank()) {
                         val type = object : TypeToken<List<RecipeIngredient>>() {}.type
@@ -97,21 +101,13 @@ class CreateRecipeViewModel @Inject constructor(
         if (recipeName.isBlank() || _ingredients.value.size < 2) return
 
         viewModelScope.launch {
+            val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+
             val finalRecipe = recipeSummary.value.copy(
                 recipeIngredientsJson = Gson().toJson(_ingredients.value)
             )
-            repository.saveRecipe(finalRecipe)
+            repository.saveRecipe(finalRecipe, userId)
 
-            if (editingRecipeId == null) {
-                repository.addDiaryEntry(
-                    DiaryEntry(
-                        product = finalRecipe,
-                        amountGrams = 100,
-                        timestamp = selectedTimestamp,
-                        mealType = MealType.valueOf(selectedMealType)
-                    )
-                )
-            }
             onSuccess()
         }
     }
@@ -209,7 +205,7 @@ fun CreateRecipeScreen(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 enabled = viewModel.recipeName.isNotBlank() && ingredients.size >= 2
             ) {
-                Text(if (viewModel.isEditing) "Сохранить" else "Сохранить и добавить в дневник")
+                Text(if (viewModel.isEditing) "Сохранить" else "Сохранить рецепт")
             }
         }
     }

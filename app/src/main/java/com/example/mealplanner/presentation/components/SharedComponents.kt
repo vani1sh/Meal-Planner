@@ -139,7 +139,7 @@ fun WeightInputDialog(
 }
 
 @Composable
-private fun MacroValue(label: String, value: String) {
+fun MacroValue(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = value, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)

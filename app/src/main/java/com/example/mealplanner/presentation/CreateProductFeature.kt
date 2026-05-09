@@ -17,9 +17,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.mealplanner.domain.model.DiaryEntry
 import com.example.mealplanner.domain.model.MealType
 import com.example.mealplanner.domain.model.Product
+import com.example.mealplanner.domain.repository.AuthRepository
 import com.example.mealplanner.domain.repository.FoodRepository
 import com.example.mealplanner.presentation.components.WeightInputDialog
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -28,6 +30,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CreateProductViewModel @Inject constructor(
     private val repository: FoodRepository,
+    private val authRepository: AuthRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -52,7 +55,9 @@ class CreateProductViewModel @Inject constructor(
         )
 
         viewModelScope.launch {
-            repository.saveCustomProduct(newProduct)
+            val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+
+            repository.saveCustomProduct(newProduct, userId)
 
             repository.addDiaryEntry(
                 DiaryEntry(
@@ -60,11 +65,14 @@ class CreateProductViewModel @Inject constructor(
                     amountGrams = amountGrams,
                     timestamp = selectedTimestamp,
                     mealType = MealType.valueOf(selectedMealType)
-                )
+                ),
+                userId = userId
             )
 
             if (addToShoppingList) {
-                repository.addProductToShoppingList(newProduct, amountGrams)
+                val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+
+                repository.addProductToShoppingList(newProduct, amountGrams, userId)
             }
 
             onSuccess()

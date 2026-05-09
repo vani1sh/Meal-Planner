@@ -18,9 +18,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mealplanner.data.local.entity.ShoppingListItemEntity
 import com.example.mealplanner.domain.repository.FoodRepository
+import com.example.mealplanner.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,10 +31,15 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ShoppingListViewModel @Inject constructor(
-    private val repository: FoodRepository
+    private val repository: FoodRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
-    val shoppingList: StateFlow<List<ShoppingListItemEntity>> = repository.getShoppingList()
+    val shoppingList: StateFlow<List<ShoppingListItemEntity>> = authRepository.currentUser
+        .flatMapLatest { userId ->
+            if (userId == null) flowOf(emptyList())
+            else repository.getShoppingList(userId)
+        }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun updateItem(item: ShoppingListItemEntity, newWeight: Int) {

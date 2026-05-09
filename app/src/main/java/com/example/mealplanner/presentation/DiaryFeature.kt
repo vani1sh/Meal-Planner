@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -25,7 +26,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mealplanner.domain.model.DiaryEntry
 import com.example.mealplanner.domain.model.MealType
+import com.example.mealplanner.domain.repository.AuthRepository
 import com.example.mealplanner.domain.repository.FoodRepository
+import com.example.mealplanner.domain.repository.UserPreferencesRepository
+import com.example.mealplanner.presentation.components.MacroValue
+import com.example.mealplanner.presentation.onboarding.UserGoal
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -43,30 +48,67 @@ data class DiaryUiState(
     val totalFat: Float = 0f,
     val totalCarbs: Float = 0f,
     val isLoading: Boolean = true,
-    val currentDate: Calendar = Calendar.getInstance()
+    val currentDate: Calendar = Calendar.getInstance(),
+    val userGoal: UserGoal? = null
 )
 
 @HiltViewModel
 class DiaryViewModel @Inject constructor(
-    private val repository: FoodRepository
+    private val repository: FoodRepository,
+    private val authRepository: AuthRepository,
+    private val userPrefsRepository: UserPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DiaryUiState())
     val uiState: StateFlow<DiaryUiState> = _uiState.asStateFlow()
+
     private var diaryJob: Job? = null
+    private var goalJob: Job? = null
 
     init {
-        loadDiaryForDate(_uiState.value.currentDate)
+        viewModelScope.launch {
+            authRepository.currentUser.collect { userId ->
+                if (userId != null) {
+                    loadGoalForUser(userId)
+                    loadDiaryForDate(_uiState.value.currentDate, userId)
+                } else {
+                    _uiState.update { DiaryUiState(isLoading = false) }
+                }
+            }
+        }
+    }
+
+    private fun loadGoalForUser(userId: String) {
+        goalJob?.cancel()
+        goalJob = viewModelScope.launch {
+            userPrefsRepository.getUserGoal(userId).collect { goal ->
+                _uiState.update { it.copy(userGoal = goal) }
+            }
+        }
     }
 
     fun changeDate(daysOffset: Int) {
         val newDate = _uiState.value.currentDate.clone() as Calendar
         newDate.add(Calendar.DAY_OF_YEAR, daysOffset)
         _uiState.update { it.copy(currentDate = newDate, isLoading = true) }
-        loadDiaryForDate(newDate)
+
+        viewModelScope.launch {
+            val userId = authRepository.currentUser.firstOrNull()
+            if (userId != null) loadDiaryForDate(newDate, userId)
+        }
     }
 
-    private fun loadDiaryForDate(calendar: Calendar) {
+    fun setDate(timestamp: Long) {
+        val newDate = Calendar.getInstance().apply { timeInMillis = timestamp }
+        _uiState.update { it.copy(currentDate = newDate, isLoading = true) }
+
+        viewModelScope.launch {
+            val userId = authRepository.currentUser.firstOrNull()
+            if (userId != null) loadDiaryForDate(newDate, userId)
+        }
+    }
+
+    private fun loadDiaryForDate(calendar: Calendar, userId: String) {
         val startOfDay = calendar.clone() as Calendar
         startOfDay.set(Calendar.HOUR_OF_DAY, 0); startOfDay.set(Calendar.MINUTE, 0); startOfDay.set(Calendar.SECOND, 0)
         val endOfDay = calendar.clone() as Calendar
@@ -74,7 +116,7 @@ class DiaryViewModel @Inject constructor(
 
         diaryJob?.cancel()
         diaryJob = viewModelScope.launch {
-            repository.getDiaryForDate(startOfDay.timeInMillis, endOfDay.timeInMillis).collect { entries ->
+            repository.getDiaryForDate(userId, startOfDay.timeInMillis, endOfDay.timeInMillis).collect { entries ->
                 _uiState.update { currentState ->
                     currentState.copy(
                         entries = entries,
@@ -89,13 +131,21 @@ class DiaryViewModel @Inject constructor(
         }
     }
 
-    fun deleteEntry(entryId: Int) = viewModelScope.launch { repository.deleteDiaryEntry(entryId) }
-    fun updateEntryWeight(entryId: Int, newWeight: Int) = viewModelScope.launch { repository.updateDiaryEntryWeight(entryId, newWeight) }
+    fun deleteEntry(entryId: Int) = viewModelScope.launch {
+        val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+        repository.deleteDiaryEntry(entryId, userId)
+    }
 
-    fun setDate(timestamp: Long) {
-        val newDate = Calendar.getInstance().apply { timeInMillis = timestamp }
-        _uiState.update { it.copy(currentDate = newDate, isLoading = true) }
-        loadDiaryForDate(newDate)
+    fun updateEntryWeight(entryId: Int, newWeight: Int) = viewModelScope.launch {
+        val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+        repository.updateDiaryEntryWeight(entryId, newWeight, userId)
+    }
+
+    fun logout(onLoggedOut: () -> Unit) {
+        viewModelScope.launch {
+            authRepository.logout()
+            onLoggedOut()
+        }
     }
 }
 
@@ -117,7 +167,7 @@ fun DiaryScreen(
     var expandedMenuFor by remember { mutableStateOf<Int?>(null) }
     var entryToEdit by remember { mutableStateOf<DiaryEntry?>(null) }
 
-    Scaffold { padding ->
+    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             DateSelector(
                 currentDate = state.currentDate,
@@ -385,19 +435,44 @@ fun DateSelector(
 
 @Composable
 fun MacrosSummaryCard(state: DiaryUiState) {
+    val goal = state.userGoal
+
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Итого за день", style = MaterialTheme.typography.titleLarge)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Калории: ${state.totalCalories.toInt()} ккал", style = MaterialTheme.typography.bodyLarge)
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("Белки: ${state.totalProtein.toInt()} г")
-                Text("Жиры: ${state.totalFat.toInt()} г")
-                Text("Углеводы: ${state.totalCarbs.toInt()} г")
+
+            val calorieText = if (goal != null) {
+                "Калории: ${state.totalCalories.toInt()} / ${goal.tdee} ккал"
+            } else {
+                "Калории: ${state.totalCalories.toInt()} ккал"
+            }
+            Text(
+                text = calorieText,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val proteinText = if (goal != null) "${state.totalProtein.toInt()} / ${goal.protein} г" else "${state.totalProtein.toInt()} г"
+                val fatText = if (goal != null) "${state.totalFat.toInt()} / ${goal.fat} г" else "${state.totalFat.toInt()} г"
+                val carbsText = if (goal != null) "${state.totalCarbs.toInt()} / ${goal.carbs} г" else "${state.totalCarbs.toInt()} г"
+
+                MacroValue(label = "Белки", value = proteinText)
+                MacroValue(label = "Жиры", value = fatText)
+                MacroValue(label = "Углеводы", value = carbsText)
             }
         }
     }

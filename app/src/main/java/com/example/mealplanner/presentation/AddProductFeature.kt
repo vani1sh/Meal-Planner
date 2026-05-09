@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mealplanner.domain.model.DiaryEntry
 import com.example.mealplanner.domain.model.MealType
 import com.example.mealplanner.domain.model.Product
+import com.example.mealplanner.domain.repository.AuthRepository
 import com.example.mealplanner.domain.repository.FoodRepository
 import com.example.mealplanner.presentation.components.WeightInputDialog
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,6 +32,7 @@ import javax.inject.Inject
 @HiltViewModel
 class AddProductViewModel @Inject constructor(
     private val repository: FoodRepository,
+    private val authRepository: AuthRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -43,13 +45,21 @@ class AddProductViewModel @Inject constructor(
     private val _searchResults = MutableStateFlow<List<Product>>(emptyList())
     val searchResults: StateFlow<List<Product>> = _searchResults.asStateFlow()
 
-    val customProducts: StateFlow<List<Product>> = repository.getCustomProductsFlow()
+    val customProducts: StateFlow<List<Product>> = authRepository.currentUser
+        .flatMapLatest { userId ->
+            if (userId == null) flowOf(emptyList())
+            else repository.getCustomProductsFlow(userId)
+        }
         .combine(_searchQuery) { list, query ->
             if (query.isBlank()) list else list.filter { it.name.contains(query, ignoreCase = true) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val recipes: StateFlow<List<Product>> = repository.getRecipesFlow()
+    val recipes: StateFlow<List<Product>> = authRepository.currentUser
+        .flatMapLatest { userId ->
+            if (userId == null) flowOf(emptyList())
+            else repository.getRecipesFlow(userId)
+        }
         .combine(_searchQuery) { list, query ->
             if (query.isBlank()) list else list.filter { it.name.contains(query, ignoreCase = true) }
         }
@@ -62,7 +72,9 @@ class AddProductViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            val result = repository.searchProducts(query)
+            val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+
+            val result = repository.searchProducts(query, userId)
             if (result.isSuccess) {
                 _searchResults.value = result.getOrNull() ?: emptyList()
             }
@@ -71,13 +83,16 @@ class AddProductViewModel @Inject constructor(
 
     fun addToDiary(product: Product, amountGrams: Int, onSuccess: () -> Unit) {
         viewModelScope.launch {
+            val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+
             repository.addDiaryEntry(
                 DiaryEntry(
                     product = product,
                     amountGrams = amountGrams,
                     timestamp = selectedTimestamp,
                     mealType = MealType.valueOf(selectedMealType)
-                )
+                ),
+                userId = userId
             )
             onSuccess()
         }
@@ -85,16 +100,18 @@ class AddProductViewModel @Inject constructor(
 
     fun addProductToShoppingList(product: Product, amountGrams: Int) {
         viewModelScope.launch {
-            repository.addProductToShoppingList(product, amountGrams)
+            val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+            repository.addProductToShoppingList(product, amountGrams, userId)
         }
     }
 
     fun deleteItem(product: Product) {
         viewModelScope.launch {
+            val userId = authRepository.currentUser.firstOrNull() ?: return@launch
             if (product.isRecipe) {
-                repository.deleteRecipe(product.id)
+                repository.deleteRecipe(product.id, userId)
             } else {
-                repository.deleteCustomProduct(product.id)
+                repository.deleteCustomProduct(product.id, userId)
             }
             updateSearchQuery(_searchQuery.value)
         }
@@ -102,8 +119,10 @@ class AddProductViewModel @Inject constructor(
 
     fun updateCustomProductMacros(product: Product, cals: Float, p: Float, f: Float, c: Float) {
         viewModelScope.launch {
+            val userId = authRepository.currentUser.firstOrNull() ?: return@launch
+
             val updatedProduct = product.copy(calories = cals, protein = p, fat = f, carbs = c)
-            repository.updateCustomProduct(updatedProduct)
+            repository.updateCustomProduct(updatedProduct, userId)
             updateSearchQuery(_searchQuery.value)
         }
     }

@@ -10,62 +10,67 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FoodDao {
+
+    // CustomProduct
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCustomProduct(product: CustomProductEntity)
 
-    @Query("DELETE FROM custom_products WHERE LOWER(name) = LOWER(:name) AND (LOWER(brand) = LOWER(:brand) OR (brand IS NULL AND :brand IS NULL))")
-    suspend fun deleteDuplicates(name: String, brand: String?)
+    @Query("DELETE FROM custom_products WHERE LOWER(name) = LOWER(:name) AND (LOWER(brand) = LOWER(:brand) OR (brand IS NULL AND :brand IS NULL)) AND userId = :userId")
+    suspend fun deleteCustomDuplicates(name: String, brand: String?, userId: String)
 
-    @Query("SELECT * FROM custom_products ORDER BY name ASC")
-    fun getAllCustomProductsFlow(): Flow<List<CustomProductEntity>>
+    @Query("SELECT * FROM custom_products WHERE userId = :userId ORDER BY name ASC")
+    fun getAllCustomProductsFlow(userId: String): Flow<List<CustomProductEntity>>
 
-    @Query("SELECT * FROM custom_products WHERE name LIKE '%' || :query || '%' OR brand LIKE '%' || :query || '%'")
-    suspend fun searchCustomProducts(query: String): List<CustomProductEntity>
+       @Query("SELECT * FROM custom_products WHERE userId = :userId AND (name LIKE '%' || :query || '%' OR brand LIKE '%' || :query || '%')")
+    suspend fun searchCustomProducts(query: String, userId: String): List<CustomProductEntity>
 
-    @Query("DELETE FROM custom_products WHERE id = :productId")
-    suspend fun deleteCustomProductById(productId: String)
+    @Query("DELETE FROM custom_products WHERE id = :productId AND userId = :userId")
+    suspend fun deleteCustomProductById(productId: String, userId: String)
 
     @Update
     suspend fun updateCustomProduct(product: CustomProductEntity)
 
+    @Query("SELECT * FROM custom_products WHERE userId = :userId ORDER BY name ASC")
+    suspend fun getAllCustomProducts(userId: String): List<CustomProductEntity>
+
+    // Diary
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDiaryEntry(entry: DiaryEntryEntity)
 
-    @Query("SELECT * FROM diary_entries WHERE timestamp BETWEEN :startOfDay AND :endOfDay ORDER BY timestamp DESC")
-    fun getDiaryEntries(startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntryEntity>>
+    @Query("SELECT * FROM diary_entries WHERE userId = :userId AND timestamp BETWEEN :startOfDay AND :endOfDay ORDER BY timestamp DESC")
+    fun getDiaryEntriesForUser(userId: String, startOfDay: Long, endOfDay: Long): Flow<List<DiaryEntryEntity>>
 
-    @Query("DELETE FROM diary_entries WHERE id = :entryId")
-    suspend fun deleteDiaryEntryById(entryId: Int)
+    @Query("DELETE FROM diary_entries WHERE id = :entryId AND userId = :userId")
+    suspend fun deleteDiaryEntry(entryId: Int, userId: String)
 
-    @Query("UPDATE diary_entries SET amountGrams = :newAmount WHERE id = :entryId")
-    suspend fun updateDiaryEntryGrams(entryId: Int, newAmount: Int)
+    @Query("UPDATE diary_entries SET amountGrams = :newAmount WHERE id = :entryId AND userId = :userId")
+    suspend fun updateDiaryEntryGrams(entryId: Int, newAmount: Int, userId: String)
 
-    @Query("SELECT * FROM custom_products ORDER BY name ASC")
-    suspend fun getAllCustomProducts(): List<CustomProductEntity>
-
+    // Recipe
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecipe(recipe: RecipeEntity)
 
-    @Query("DELETE FROM recipes WHERE LOWER(name) = LOWER(:name)")
-    suspend fun deleteRecipeDuplicates(name: String)
+    @Query("DELETE FROM recipes WHERE LOWER(name) = LOWER(:name) AND userId = :userId")
+    suspend fun deleteRecipeDuplicates(name: String, userId: String)
 
-    @Query("SELECT * FROM recipes ORDER BY name ASC")
-    fun getAllRecipesFlow(): Flow<List<RecipeEntity>>
+    @Query("SELECT * FROM recipes WHERE userId = :userId ORDER BY name ASC")
+    fun getAllRecipesFlow(userId: String): Flow<List<RecipeEntity>>
 
-    @Query("SELECT * FROM recipes WHERE name LIKE '%' || :query || '%'")
-    suspend fun searchRecipes(query: String): List<RecipeEntity>
+    @Query("SELECT * FROM recipes WHERE userId = :userId AND name LIKE '%' || :query || '%'")
+    suspend fun searchRecipes(query: String, userId: String): List<RecipeEntity>
 
-    @Query("DELETE FROM recipes WHERE id = :recipeId")
-    suspend fun deleteRecipeById(recipeId: String)
+    @Query("DELETE FROM recipes WHERE id = :recipeId AND userId = :userId")
+    suspend fun deleteRecipeById(recipeId: String, userId: String)
 
     @Update
     suspend fun updateRecipe(recipe: RecipeEntity)
 
-    @Query("SELECT * FROM recipes WHERE id = :id LIMIT 1")
-    suspend fun getRecipeById(id: String): RecipeEntity?
+    @Query("SELECT * FROM recipes WHERE id = :id AND userId = :userId LIMIT 1")
+    suspend fun getRecipeById(id: String, userId: String): RecipeEntity?
 
-    @Query("SELECT * FROM shopping_list")
-    fun getShoppingList(): Flow<List<ShoppingListItemEntity>>
+    // ShoppingList
+    @Query("SELECT * FROM shopping_list WHERE userId = :userId")
+    fun getShoppingList(userId: String): Flow<List<ShoppingListItemEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertShoppingListItem(item: ShoppingListItemEntity)
@@ -84,7 +89,7 @@ interface FoodDao {
     RecipeEntity::class,
     ShoppingListItemEntity::class
     ],
-    version = 5, exportSchema = false)
+    version = 7, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun foodDao(): FoodDao
 }
